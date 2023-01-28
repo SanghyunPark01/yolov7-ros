@@ -3,8 +3,11 @@
         <!-- Download the official weights from the original repo -->
         <!-- 7 OK, yolov7-w6 OK, 7x too slow,e6e too slow, -->
         <param name="weights_path" type="str" value="$(find yolov7_ros)/weights/yolov7.pt" />
-        <!-- topic name to subscribe to -->
-        <param name="img_topic" type="str" value="/zed2i/zed_node/rgb/image_rect_color" />
+        <!-- topic name to subscribe to : /camera/color/image_raw /kitti/camera_color_left/image_raw-->
+        <param name="img_topic" type="str" value="/camera/color/image_raw" />
+        <!-- /camera/color/image_raw  /-->
+        <!-- topic name to subscribe to : /-->
+        <param name="depth_topic" type="str" value="/camera/depth/image_rect_raw" />
         <!-- topic name for the detection output -->
         <param name="out_topic" type="str" value="yolov7_detection" />        
         <!-- confidence threshold -->
@@ -12,7 +15,7 @@
         <!-- intersection over union threshold -->
         <param name="iou_thresh" type="double" value="0.6" />
         <!-- queue size for publishing -->
-        <param name="queue_size" type="int" value="1" />
+        <param name="queue_size" type="int" value="10" />
         <!-- image size to which to resize each input image before feeding into the
         network (the final output is rescaled to the original image size)   This cna be 640 or 1280 -->
         <param name="img_size" type="int" value="640" />

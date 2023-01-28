@@ -9,7 +9,7 @@ from utils.ros import load_yaml
 from typing import Tuple, Union
 from torchvision.transforms import ToTensor
 import numpy as np
-
+import message_filters
 
 from yolov7_ros.msg import ObjectsStamped
 from sensor_msgs.msg import Image
@@ -41,7 +41,7 @@ class YoloV7:
 
 
 class Yolov7Publisher:
-    def __init__(self, img_topic: str, weights: str, conf_thresh: float = 0.5,
+    def __init__(self, img_topic: str,depth_topic: str, weights: str, conf_thresh: float = 0.5,
                  iou_thresh: float = 0.45, pub_topic: str = "yolov7_detections",
                  device: str = "cuda",
                  yaml: str = "conf/coco.yaml", 
@@ -78,11 +78,24 @@ class Yolov7Publisher:
             weights=weights, conf_thresh=conf_thresh, iou_thresh=iou_thresh,
             device=device
         )
-        self.img_subscriber = rospy.Subscriber(
-            img_topic, Image, self.process_img_msg
-        )
+        # self.img_subscriber = rospy.Subscriber(
+        #     img_topic, Image, self.process_img_msg
+        # )
+        # self.depth_subscriber = rospy.Subscriber(
+        #     depth_topic, Image, self.subpub_depth
+        # )
+        self.img_subscriber = message_filters.Subscriber(img_topic, Image)
+        self.depth_subscriber = message_filters.Subscriber(depth_topic, Image)
+        ts = message_filters.ApproximateTimeSynchronizer([self.img_subscriber, self.depth_subscriber], queue_size=10, slop=0.01)
+        ts.registerCallback(self.process_img_msg)
         self.detection_publisher = rospy.Publisher(
             pub_topic, ObjectsStamped, queue_size=queue_size
+        )
+        self.detected_image = rospy.Publisher(
+            'detected_image', Image, queue_size=queue_size
+        )
+        self.detected_depth = rospy.Publisher(
+            'detected_depth', Image, queue_size=queue_size
         )
         rospy.loginfo("YOLOv7 initialization complete. Ready to start inference")
 
@@ -102,13 +115,17 @@ class Yolov7Publisher:
         boxes[:, [1, 3]] *= yscale
 
         return boxes
+
+    def subpub_depth(self, img_depth: Image):
+        self.depth_image = img_depth
     
-    def process_img_msg(self, img_msg: Image):
+    def process_img_msg(self, img_msg, img_depth):
         """ callback function for publisher """
         np_img_orig = self.bridge.imgmsg_to_cv2(
-            img_msg, desired_encoding='passthrough'
+            img_msg, desired_encoding='bgr8'
         )
-
+        det_img = img_msg
+        #np_img_orig = cv2.cvtColor(np_img_orig, cv2.COLOR_BGR2RGB)
         # handle possible different img formats
         if len(np_img_orig.shape) == 2:
             np_img_orig = np.stack([np_img_orig] * 3, axis=2)
@@ -143,7 +160,9 @@ class Yolov7Publisher:
         #Publishing Detections
         detection_msg = create_stamped_detection_msg(detections, self.class_names)
         self.detection_publisher.publish(detection_msg)
-
+        self.detected_image.publish(det_img)
+        self.detected_depth.publish(img_depth)
+        # self.detected_depth.publish(self.depth_image)
         #Publishing Visualization if Required
         if self.visualization_publisher:
             bboxes = [[int(x1), int(y1), int(x2), int(y2)]
@@ -162,6 +181,7 @@ if __name__ == "__main__":
 
     weights_path = rospy.get_param(ns + "weights_path")
     img_topic = rospy.get_param(ns + "img_topic")
+    depth_topic = rospy.get_param(ns + "depth_topic")
     out_topic = rospy.get_param(ns + "out_topic")
     conf_thresh = rospy.get_param(ns + "conf_thresh")
     iou_thresh = rospy.get_param(ns + "iou_thresh")
@@ -180,6 +200,7 @@ if __name__ == "__main__":
 
     publisher = Yolov7Publisher(
         img_topic=img_topic,
+        depth_topic = depth_topic,
         pub_topic=out_topic,
         weights=weights_path,
         device=device,

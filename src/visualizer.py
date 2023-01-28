@@ -13,7 +13,7 @@ def get_random_color(seed):
 def draw_detections(img: np.array, bboxes: List[List[int]], classes: List[int], prediction_scores: List[List[float]], class_names):
     for bbox, cls, prd in zip(bboxes, classes, prediction_scores):
         x1, y1, x2, y2 = bbox
-
+	
         color = get_random_color(int(cls))
         img = cv2.rectangle(
             img, (int(x1), int(y1)), (int(x2), int(y2)), color, 1
